@@ -1,0 +1,95 @@
+---
+title: "project_arm"
+author: "Sierra Rose"
+date: "2025-03-25"
+output: html_document
+---
+```{r}
+library(arules)
+library(arulesViz)
+library(tcltk)
+library(dplyr)
+library(igraph)
+```
+
+```{r}
+books_df <- read.csv("C:/Users/hisie/OneDrive/Documents/CU Boulder/MSDS/Spring 2025/Text Mining/All_Data.csv")
+books_df <- books_df %>% select(-LABEL)
+books_df <- books_df %>% select(-brooke)
+head(books_df)
+```
+
+```{r}
+word_list_df <- apply(books_df, 1, function(row) {
+  words <- names(row)[which(as.numeric(row) > 0)]
+  words[words != "0"]  # <-- Remove "0" from the list
+})
+
+
+head(word_list_df)
+
+# This creates a long-format data frame from your list of transactions
+books_transactions <- sapply(word_list_df, function(x) {
+  paste(sprintf('"%s"', x), collapse = ",")
+})
+
+writeLines(books_transactions, "C:/Users/hisie/OneDrive/Documents/CU Boulder/MSDS/Spring 2025/Text Mining/books_transactions.csv")
+```
+
+```{r}
+transactions <- read.transactions("C:/Users/hisie/OneDrive/Documents/CU Boulder/MSDS/Spring 2025/Text Mining/books_transactions.csv",
+                           rm.duplicates = FALSE, 
+                           format = "basket",  
+                           sep=",",
+                           quote = "\"")
+arules::inspect(transactions[1:5])
+```
+
+```{r}
+FrulesR = arules::apriori(transactions, parameter = list(support=.008, 
+                                                 confidence=.5, minlen=2))
+arules::inspect(FrulesR)
+```
+
+```{r}
+## Sort rules by a measure such as conf, sup, or lift
+sup_rules <- sort(FrulesR, by="support", decreasing=TRUE)
+arules::inspect(sup_rules[1:15])
+```
+
+```{r}
+sup_rules <- head(sup_rules)
+plot(sup_rules)
+plot(sup_rules, method="graph",  engine = "htmlwidget")
+# Convert to igraph object
+ig <- plot(sup_rules, method = "graph", engine = "igraph", control = list(type = "items"))
+```
+
+```{r}
+## Sort rules by a measure such as conf, sup, or lift
+conf_rules <- sort(FrulesR, by="confidence", decreasing=TRUE)
+arules::inspect(conf_rules[1:15])
+```
+
+```{r}
+conf_rules <- head(conf_rules)
+plot(conf_rules)
+plot(conf_rules, method="graph",  engine = "htmlwidget")
+# Convert to igraph object
+ig <- plot(conf_rules, method = "graph", engine = "igraph", control = list(type = "items"))
+```
+
+```{r}
+## Sort rules by a measure such as conf, sup, or lift
+lift_rules <- sort(FrulesR, by="lift", decreasing=TRUE)
+arules::inspect(lift_rules[1:15])
+```
+
+```{r}
+lift_rules <- head(lift_rules)
+plot(lift_rules)
+plot(lift_rules, method="graph",  engine = "htmlwidget")
+# Convert to igraph object
+ig <- plot(lift_rules, method = "graph", engine = "igraph", control = list(type = "items"))
+```
+

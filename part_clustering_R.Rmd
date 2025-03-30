@@ -1,0 +1,139 @@
+---
+title: "Project_Clustering"
+author: "Sierra Rose"
+date: "2025-03-25"
+output: html_document
+---
+
+# Clustering
+
+```{r}
+library(tm)
+library(stringr)
+library(wordcloud)
+library(slam)
+library(quanteda)
+library(SnowballC)
+library(arules)
+library(proxy)
+library(cluster)
+library(stringi)
+library(proxy)
+library(Matrix)
+library(tidytext) # convert DTM to DF
+library(plyr) ## for adply
+library(ggplot2)
+library(factoextra) # for fviz
+library(mclust) # for Mclust EM clustering
+library(textstem)  ## Needed for lemmatize_strings
+library(amap)  ## for Kmeans
+library(networkD3)
+```
+
+## Data Prep for Clustering
+
+```{r}
+setwd("C:/Users/hisie/OneDrive/Documents/CU Boulder/MSDS/Spring 2025")
+
+books_corp <- Corpus(DirSource("Books_News"))
+(ndocs <- length(books_corp))
+
+books_corp <- tm_map(books_corp, content_transformer(tolower))
+books_corp <- tm_map(books_corp, removePunctuation)
+books_corp <- tm_map(books_corp, removeNumbers)
+# Remove all Stop Words
+books_corp <- tm_map(books_corp, removeWords, stopwords("english"))
+books_corp <- tm_map(books_corp, lemmatize_strings)
+
+## You can also remove words that you do not want
+stop_words <- c("and","like", "very", "can", "I", "also", "lot")
+books_corp <- tm_map(books_corp, removeWords, stop_words)
+
+
+# list docs in corpus
+summary(books_corp)  
+```
+
+```{r}
+set.seed(42)
+sampled_idx <- sample(1:length(books_corp), 10)  # Or however many you want
+books_corp_sampled <- books_corp[sampled_idx]
+head(books_corp_sampled)
+```
+
+
+```{r}
+
+minTermFreq <- ndocs * 0.01
+maxTermFreq <- ndocs * .75
+
+books_dtm <- DocumentTermMatrix(books_corp_sampled,
+                           control = list(
+                           stopwords = TRUE, ## remove normal stopwords
+                           wordLengths=c(4, 15), ## get rid of words of len 3 or smaller or larger than 15
+                           removePunctuation = TRUE,
+                           removeNumbers = TRUE,
+                           tolower=TRUE,
+                           stemming = TRUE,
+                           remove_separators = TRUE,
+                           bounds = list(global = c(minTermFreq, maxTermFreq))
+                         ))
+
+books_mat <- as.matrix(books_dtm)
+books_mat
+```
+
+```{r}
+# normalize data
+books_norm <- as.matrix(books_dtm)
+books_norm <- apply(books_norm, 1, function(i) round(i/sum(i), 2))
+books_norm_mat <- t(books_norm)
+#books_norm_mat[1:13,1:10]
+```
+
+```{r}
+books_df <- as.data.frame(as.matrix(books_dtm))
+
+######### Next - you can convert a matrix (or normalized matrix) to a DF
+books_mat_df <- as.data.frame(books_norm_mat)
+```
+
+```{r}
+# Sample 50 random rows (i.e., documents) from the matrix
+set.seed(123)  # For reproducibility
+sample_size <- 10
+row_idx <- sample(nrow(books_mat_df), sample_size)
+
+# Subset the matrix
+books_mat_df <- books_mat_df[row_idx, ]
+
+```
+
+## Distance Measures
+
+```{r}
+books_norm_mat_dist <- books_mat_df
+books_norm_mat_dist <- books_norm_mat_dist[rowSums(books_norm_mat_dist) != 0, ]
+books_norm_mat_dist <- books_norm_mat_dist[complete.cases(books_norm_mat_dist), ]
+cos_dist_mat <- proxy::dist(books_norm_mat_dist, method="cosine")
+print("cos sim matrix is :\n")
+print(cos_dist_mat) ##small number is less distant
+```
+
+```{r}
+any(is.na(cos_dist_mat))     # TRUE if there are NAs
+any(is.infinite(cos_dist_mat)) # TRUE if there are Infs
+
+library(proxy)
+```
+
+
+```{r}
+clust_cos_norm <- hclust(cos_dist_mat, method="ward.D")
+plot(clust_cos_norm, cex=0.9, hang=-1,main = "Cosine Sim and Normalized")
+rect.hclust(clust_cos_norm, k=4)
+```
+```{r}
+radialNetwork(as.radialNetwork(clust_cos_norm))
+```
+
